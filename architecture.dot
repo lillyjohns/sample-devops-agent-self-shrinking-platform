@@ -1,0 +1,85 @@
+digraph G {
+  rankdir=LR;
+  fontname="Helvetica";
+  fontsize=12;
+  compound=true;
+  node [fontname="Helvetica", fontsize=11, shape=box, style="rounded,filled", fillcolor="#ffffff", color="#555555"];
+  edge [fontname="Helvetica", fontsize=9, color="#444444"];
+  graph [splines=spline, nodesep=0.5, ranksep=0.9];
+
+  /* ---------- Entry points ---------- */
+  subgraph cluster_clients {
+    label="Entry Points";
+    style="rounded,filled";
+    fillcolor="#eef4fb";
+    color="#7aa5d2";
+    console [label="DevOps Agent Console\n(human operator)", fillcolor="#dce9f7"];
+    ide     [label="Claude / Kiro\n(headless via MCP)", fillcolor="#dce9f7"];
+    cli     [label="Demo CLI\nmake break-scenario-N", fillcolor="#dce9f7"];
+  }
+
+  /* ---------- Single AWS Account ---------- */
+  subgraph cluster_aws {
+    label="AWS Account (single)";
+    style="rounded,filled";
+    fillcolor="#fdf6ec";
+    color="#e0a94f";
+
+    subgraph cluster_devops {
+      label="AWS DevOps Agent (Agent Space)";
+      style="rounded,filled";
+      fillcolor="#fceede";
+      color="#d98b3a";
+      sre    [label="Custom SRE Agent\n\"Daily Cost Sweep\"\n(scheduled)", fillcolor="#f9ddc0"];
+      invest [label="Investigation Engine", fillcolor="#f9ddc0"];
+    }
+
+    alarm  [label="Cost Anomaly Detection\n+ CloudWatch Alarm\n→ SNS → Webhook Lambda", fillcolor="#fbe3e3"];
+
+    subgraph cluster_gw {
+      label="AgentCore Gateway (single)";
+      style="rounded,filled";
+      fillcolor="#e9f5ec";
+      color="#5aa46b";
+      gw [label="MCP Gateway\n(semantic tool search,\nOAuth via Cognito)", fillcolor="#d3ecd9"];
+      mcp_ce  [label="Cost Explorer\nMCP target"];
+      mcp_co  [label="Compute Optimizer\nMCP target"];
+      mcp_cw  [label="CloudWatch /\nTrusted Advisor MCP"];
+      mcp_gh  [label="GitHub read MCP\n(IaC context)"];
+      mcp_rpt [label="generate_cost_report\nLambda → xlsx → S3\n(presigned URL)"];
+    }
+
+    pragent [label="Remediation-PR Agent\n(AgentCore Runtime, Strands)\nfindings → IaC diff → PR\n[PHASE 1 — decommission later]", fillcolor="#efe3f7", color="#8e5bb5", penwidth=2];
+
+    workload [label="Demo Workload\noversized EC2, idle NAT GW,\nunattached EBS, gp2 vols", fillcolor="#f0f0f0"];
+  }
+
+  /* ---------- GitHub ---------- */
+  subgraph cluster_gh {
+    label="GitHub";
+    style="rounded,filled";
+    fillcolor="#f2f2f2";
+    color="#888888";
+    repo [label="IaC Repo\n(Terraform / CDK)"];
+    pr   [label="Pull Request\n(human review = HITL)", fillcolor="#e2f0e2"];
+  }
+
+  /* ---------- Flows ---------- */
+  console -> invest [label="chat / review"];
+  ide -> gw [label="MCP (headless)"];
+  cli -> workload [label="break / restore"];
+
+  workload -> alarm [label="waste detected"];
+  alarm -> invest [label="webhook trigger"];
+  sre -> invest [label="daily schedule"];
+
+  invest -> gw [label="MCP tools"];
+  gw -> mcp_ce; gw -> mcp_co; gw -> mcp_cw; gw -> mcp_gh; gw -> mcp_rpt;
+
+  invest -> pragent [label="A2A delegation\n(structured finding)", color="#8e5bb5", penwidth=2];
+  pragent -> gw [label="MCP (repo context)", style=dashed, color="#8e5bb5"];
+  pragent -> pr [label="open PR", color="#8e5bb5", penwidth=2];
+  pr -> repo [label="merge → apply"];
+
+  invest -> pr [label="PHASE 2: native PR\n(A2A agent decommissioned)", style=dashed, color="#999999", fontcolor="#999999"];
+}
