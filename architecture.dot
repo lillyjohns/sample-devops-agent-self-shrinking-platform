@@ -42,10 +42,10 @@ digraph G {
       fillcolor="#e9f5ec";
       color="#5aa46b";
       gw [label="MCP Gateway\n(semantic tool search,\nOAuth via Cognito)", fillcolor="#d3ecd9"];
-      mcp_ce  [label="Cost Explorer\nMCP target"];
-      mcp_co  [label="Compute Optimizer\nMCP target"];
-      mcp_cw  [label="CloudWatch /\nTrusted Advisor MCP"];
-      mcp_gh  [label="GitHub read MCP\n(IaC context)"];
+      mcp_ce  [label="Cost Explorer MCP\n(awslabs, reused)"];
+      mcp_pr  [label="AWS Pricing MCP\n(awslabs, reused)\n→ $ savings in PRs"];
+      mcp_fw  [label="find_cost_waste\n(custom Lambda:\nCompute Optimizer + TA\n+ idle heuristics)"];
+      mcp_iac [label="locate_iac_source\n(custom Lambda:\nARN → Terraform/CDK block,\nread-only)"];
       mcp_rpt [label="generate_cost_report\nLambda → xlsx → S3\n(presigned URL)"];
     }
 
@@ -74,11 +74,11 @@ digraph G {
   sre -> invest [label="daily schedule"];
 
   invest -> gw [label="MCP tools"];
-  gw -> mcp_ce; gw -> mcp_co; gw -> mcp_cw; gw -> mcp_gh; gw -> mcp_rpt;
+  gw -> mcp_ce; gw -> mcp_pr; gw -> mcp_fw; gw -> mcp_iac; gw -> mcp_rpt;
 
   invest -> pragent [label="A2A delegation\n(structured finding)", color="#8e5bb5", penwidth=2];
-  pragent -> gw [label="MCP (repo context)", style=dashed, color="#8e5bb5"];
-  pragent -> pr [label="open PR", color="#8e5bb5", penwidth=2];
+  pragent -> gw [label="MCP (IaC context,\npricing)", style=dashed, color="#8e5bb5"];
+  pragent -> pr [label="open PR\n(private GitHub write creds,\nnot on Gateway)", color="#8e5bb5", penwidth=2];
   pr -> repo [label="merge → apply"];
 
   invest -> pr [label="PHASE 2: native PR\n(A2A agent decommissioned)", style=dashed, color="#999999", fontcolor="#999999"];

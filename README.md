@@ -41,13 +41,20 @@ Dumb capabilities (Cost Explorer queries, report generation, GitHub reads) live 
 
 **AgentCore Gateway (single) — the toolbox**
 
-| MCP target | Purpose |
-|---|---|
-| Cost Explorer | Spend data, anomaly details |
-| Compute Optimizer | Rightsizing recommendations |
-| CloudWatch / Trusted Advisor | Utilization metrics, checks |
-| GitHub (read) | IaC repo context for mapping resources → Terraform/CDK blocks |
-| `generate_cost_report` | Lambda → xlsx (openpyxl) → S3 → presigned URL. Available to **every** client: DevOps Agent attaches it to investigations, Claude/Kiro fetch it from the IDE, scheduled agents can mail it weekly |
+Target selection criteria: (a) not already native to DevOps Agent, (b) needed by multiple clients, (c) safe to expose to *every* Gateway client.
+
+| MCP target | Type | Purpose |
+|---|---|---|
+| Cost Explorer MCP | **awslabs, reused** | Spend data, anomalies, forecasts |
+| AWS Pricing MCP | **awslabs, reused** | Price lookups so PRs state *"saves ~$47/month"* — recommendations without dollar amounts don't get merged |
+| `find_cost_waste` | custom Lambda | One purposeful tool wrapping Compute Optimizer + Trusted Advisor cost checks + idle-resource heuristics (NAT GW bytes, unattached EBS, gp2 inventory). Curated tools beat raw API mirrors for LLM tool selection |
+| `locate_iac_source` | custom Lambda | The real job isn't "read GitHub" — it's **resource ARN → owning Terraform/CDK block** (tags + Resource Explorer + scoped read-only repo search). Hardest problem in the sample, promoted to a first-class tool |
+| `generate_cost_report` | custom Lambda | xlsx (openpyxl) → S3 → presigned URL. Available to **every** client: DevOps Agent attaches it to investigations, Claude/Kiro fetch it from the IDE, scheduled agents can mail it weekly |
+| *(optional)* DevOps Agent MCP endpoint | passthrough | `start_investigation` / `get_investigation_status` for the single-endpoint IDE story (entry-point Option 2) |
+
+**Deliberately NOT behind the Gateway:**
+- **CloudWatch / CloudTrail / logs MCPs** — DevOps Agent investigates with these natively; duplicating them adds cost and tool-selection confusion for zero new capability
+- **GitHub write access** — write credentials on a shared Gateway would let any connected IDE client silently open PRs. Write stays a *private* capability of the Remediation-PR Agent (own runtime, own secret). Least privilege by architecture; Gateway exposes read-only `locate_iac_source` instead
 
 **Remediation-PR Agent (Phase 1, decommission later)**
 - AgentCore Runtime (Strands), registered as A2A sub-agent of DevOps Agent
@@ -107,6 +114,8 @@ CloudFormation now has first-class DevOps Agent resources ([`AWS::DevOpsAgent::*
 | DevOps Agent as orchestrator (console = primary UX) | Custom frontend + Gateway fronting everything (Thomson Reuters pattern); putting DevOps Agent *behind* the Gateway | A custom frontend demotes DevOps Agent to just-another-tool and forces you to rebuild Agent Spaces, timelines, dashboards, incident-skip, memories. TR's pattern fits a multi-team enterprise hub, not a single-account sample. It also muddies the decommission story — the sample only reads cleanly if DevOps Agent is the brain. |
 | A2A sub-agent for PR work (not EventBridge handoff) | Structured recommendation events on EventBridge | A2A makes decommissioning literally "remove one connection". EventBridge handoff would still work but is a weaker upgrade story. |
 | Excel reporting as a Gateway MCP tool | Client-side generation in Claude cowork | Behind the Gateway, *every* client gets it (scheduled agents included); client-side means reports only exist when a human with Claude asks. |
+| Curated MCP tools (`find_cost_waste`, `locate_iac_source`) over raw API mirrors | One MCP target per AWS API (Compute Optimizer, Trusted Advisor, GitHub…) | Fewer, purposeful tools improve LLM tool selection; reusing awslabs MCP servers (Cost Explorer, Pricing) shows composition over reinvention. |
+| GitHub write creds private to PR agent | GitHub read/write MCP on the shared Gateway | Anyone connected to the Gateway could open PRs. Read-only IaC lookup is shared; the write path is isolated with its own secret. |
 | CLI break/fix instead of web dashboard | Interactive dashboard like the networking demo | Less code to maintain, fits DevOps audience, keeps focus on the agent pattern rather than UI. |
 
 ## Prior art / references
