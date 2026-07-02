@@ -7,6 +7,7 @@ import * as agentcore from 'aws-cdk-lib/aws-bedrockagentcore';
 import { Construct } from 'constructs';
 import * as path from 'path';
 import { loadMcpManifests, McpCapabilityManifest } from './manifest';
+import { MCP_SERVER_NAME, MAX_COMBINED_TOOL_NAME } from './constants';
 
 export interface CapabilitiesProps {
   /** Absolute path to the capabilities/ directory. */
@@ -30,6 +31,12 @@ export interface CapabilitiesProps {
 export class Capabilities extends Construct {
   public readonly targets: agentcore.CfnGatewayTarget[] = [];
   public readonly manifests: McpCapabilityManifest[];
+  /**
+   * Fully-qualified Gateway tool names (`<targetName>___<toolName>`) for every enabled
+   * lambda-backed tool. Used to derive the DevOps Agent Association allowlist so the
+   * catalog and the allowlist can never drift.
+   */
+  public readonly toolNames: string[] = [];
   /** Scratch bucket for tool artifacts (reports etc.). Tools may write here and only here. */
   private readonly artifactBucket: s3.Bucket;
 
@@ -69,6 +76,20 @@ export class Capabilities extends Construct {
   }
 
   private addLambdaTarget(m: McpCapabilityManifest, gateway: agentcore.CfnGateway): void {
+    // Synth-time guard: DevOps Agent rejects tools where the combined registered
+    // server name + '_' + Gateway tool name exceeds 64 chars. Fail fast here
+    // rather than mid-deploy.
+    for (const t of m.tools ?? []) {
+      const combined = `${MCP_SERVER_NAME}_${m.name}___${t.name}`;
+      if (combined.length > MAX_COMBINED_TOOL_NAME) {
+        throw new Error(
+          `${m.name}/${t.name}: combined MCP name '${combined}' is ${combined.length} chars ` +
+            `(max ${MAX_COMBINED_TOOL_NAME}). Shorten the capability or tool name.`
+        );
+      }
+      this.toolNames.push(`${m.name}___${t.name}`);
+    }
+
     const fn = new lambda.Function(this, `${m.name}-fn`, {
       functionName: `gov-blueprint-${m.name}`,
       runtime: lambda.Runtime.PYTHON_3_13,

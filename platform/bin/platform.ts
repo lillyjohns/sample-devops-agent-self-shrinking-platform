@@ -20,6 +20,7 @@ new DevOpsAgentStack(app, 'GovernanceBlueprint-DevOpsAgent', {
   description: 'DevOps Agent Governance Blueprint - Agent Space + Gateway binding',
   gatewayUrl: platform.gatewayUrl,
   gatewayInvokeRoleArn: platform.gatewayInvokeRoleArn,
+  toolNames: platform.toolNames,
 });
 
 // Governance: every resource in every stack carries the project tag (override in cdk.json)

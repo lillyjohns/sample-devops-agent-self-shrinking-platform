@@ -1,9 +1,12 @@
 import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
+import { MCP_SERVER_NAME, GATEWAY_SEARCH_TOOL } from './constants';
 
 export interface DevOpsAgentStackProps extends cdk.StackProps {
   gatewayUrl: string;
   gatewayInvokeRoleArn: string;
+  /** Gateway tool names to allowlist for this Agent Space (derived from the catalog). */
+  toolNames: string[];
 }
 
 /**
@@ -35,7 +38,7 @@ export class DevOpsAgentStack extends cdk.Stack {
         ServiceDetails: {
           MCPServerSigV4: {
             // Keep short: DevOps Agent enforces len(serverName + '_' + toolName) <= 64
-            Name: 'gov-gw',
+            Name: MCP_SERVER_NAME,
             Endpoint: props.gatewayUrl,
             Description:
               'Platform capability Gateway - all governed tools are discovered through this single endpoint',
@@ -54,15 +57,12 @@ export class DevOpsAgentStack extends cdk.Stack {
       properties: {
         AgentSpaceId: agentSpace.getAtt('AgentSpaceId').toString(),
         ServiceId: gatewayService.getAtt('ServiceId').toString(),
-        // Governance: explicit tool allowlist per Agent Space (semantic search tool
-        // included so DevOps Agent can discover new capabilities as they are added).
+        // Governance: explicit tool allowlist per Agent Space, derived from the
+        // capability catalog at synth time (semantic search tool included so
+        // DevOps Agent can discover new capabilities as they are added).
         Configuration: {
           MCPServerSigV4: {
-            Tools: [
-              'x_amz_bedrock_agentcore_search',
-              'find-cost-waste___find_cost_waste',
-              'generate-report___generate_cost_report',
-            ],
+            Tools: [GATEWAY_SEARCH_TOOL, ...props.toolNames],
           },
         },
       },

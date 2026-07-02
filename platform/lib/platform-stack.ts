@@ -12,6 +12,8 @@ import { Capabilities } from './capabilities-construct';
 export class PlatformStack extends cdk.Stack {
   public readonly gatewayUrl: string;
   public readonly gatewayInvokeRoleArn: string;
+  /** Fully-qualified Gateway tool names for the DevOps Agent allowlist. */
+  public readonly toolNames: string[];
 
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
@@ -75,6 +77,7 @@ export class PlatformStack extends cdk.Stack {
 
     this.gatewayUrl = gateway.attrGatewayUrl;
     this.gatewayInvokeRoleArn = invokeRole.roleArn;
+    this.toolNames = capabilities.toolNames;
 
     new cdk.CfnOutput(this, 'GatewayUrl', { value: this.gatewayUrl });
     new cdk.CfnOutput(this, 'GatewayInvokeRoleArn', { value: this.gatewayInvokeRoleArn });

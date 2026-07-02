@@ -32,6 +32,7 @@ An extensible AI platform blueprint built on [AWS DevOps Agent](https://docs.aws
 - [Entry points](#entry-points)
 - [Demo walkthrough](#demo-walkthrough)
 - [Deployability](#deployability)
+- [Testing](#testing)
 - [Project structure](#project-structure)
 - [Design deep-dive](#design-deep-dive)
 - [Roadmap](#roadmap)
@@ -187,6 +188,32 @@ Target: **single `cdk deploy`** (~95% today, tracked in [Roadmap](#roadmap)).
 | AgentCore Gateway, targets, Runtime; workload; alarms; webhook Lambda | ✅ CDK |
 | GitHub credentials for the PR agent | ✅ Secrets Manager (seeded by script) — deliberately **not** DevOps Agent's OAuth GitHub integration, which [cannot be provisioned via CloudFormation](https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-resource-devopsagent-service.html) |
 | Webhook + auth, A2A registration, scheduled agent definition | ⚠️ post-deploy script/console — custom-resource candidates (June 2026 Asset APIs + repo-importable skills look promising) |
+
+## Testing
+
+Three layers, from free to live:
+
+| Layer | What it proves | Run |
+|:------|:---------------|:----|
+| **Governance unit tests** | The manifest gate rejects write capabilities, mutating IAM actions, and malformed packs — and every real manifest in the repo passes it | `cd platform && npm test` |
+| **Synth assertion tests** | Deployed shape without touching AWS: Gateway auth + both MCP protocol versions, `GATEWAY_IAM_ROLE`-only targets, `aidevops.amazonaws.com` trust with confused-deputy conditions, least-privilege scoping, project tagging, the 64-char tool-name budget, and the catalog-derived tool allowlist | (included in `npm test`) |
+| **Live E2E smoke test** | The deployed platform end-to-end, exactly the way DevOps Agent calls it: SigV4-signed MCP `initialize` → `tools/list` → `tools/call` for every capability, CSV artifact download — and optionally plants a real unattached EBS volume, verifies the waste detector finds it, and cleans it up | `python3 scripts/e2e_test.py --region <region> [--plant-waste]` |
+
+The E2E script reads the Gateway URL from the CloudFormation outputs — no configuration needed. Exit code 0 means everything passed:
+
+```text
+[PASS] stack GovernanceBlueprint-Platform healthy — UPDATE_COMPLETE
+[PASS] stack GovernanceBlueprint-DevOpsAgent healthy — CREATE_COMPLETE
+[PASS] GatewayUrl output present
+[PASS] MCP initialize handshake
+[PASS] tools/list exposes catalog
+[PASS] find_cost_waste returns well-formed result — 0 findings
+[PASS] generate_cost_report returns downloadable CSV
+[PASS] planted EBS volume detected as waste — vol-09a4ae5e174e41588
+       cleaned up vol-09a4ae5e174e41588
+
+8 passed, 0 failed
+```
 
 ## Project structure
 
