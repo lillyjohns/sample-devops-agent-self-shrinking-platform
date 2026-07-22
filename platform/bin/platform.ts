@@ -3,6 +3,7 @@ import * as cdk from 'aws-cdk-lib';
 import { PlatformStack } from '../lib/platform-stack';
 import { DevOpsAgentStack } from '../lib/devops-agent-stack';
 import { ScenariosStack } from '../lib/scenarios-stack';
+import { RemediationAgentStack } from '../lib/remediation-agent-stack';
 
 const app = new cdk.App();
 
@@ -27,6 +28,13 @@ const agent = new DevOpsAgentStack(app, 'GovernanceBlueprint-DevOpsAgent', {
 new ScenariosStack(app, 'GovernanceBlueprint-Scenarios', {
   env,
   description: 'DevOps Agent Governance Blueprint - demo scenarios (alert glue, break/fix workload)',
+  agentSpaceId: agent.agentSpaceId,
+});
+
+new RemediationAgentStack(app, 'GovernanceBlueprint-RemediationAgent', {
+  env,
+  description:
+    'DevOps Agent Governance Blueprint - A2A remediation agent (AgentCore Runtime + AgentSpace association)',
   agentSpaceId: agent.agentSpaceId,
 });
 
